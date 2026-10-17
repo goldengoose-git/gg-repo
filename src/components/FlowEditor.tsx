@@ -1,8 +1,10 @@
 'use client';
 
-// FlowEditor (Fase 2): toolbar + modali + FlowViewer, tutto con stato SOLO client.
-// Nessuna scrittura su DB / localStorage: al ricaricamento si riparte dai dati di Supabase.
-// I ruoli diversi da mapeditor/admin vedono il viewer in sola lettura (nessun controllo).
+// FlowEditor: toolbar + modali + FlowViewer.
+//   Fase 2: stato SOLO client (add/remove, undo/redo, reset).
+//   Fase 3: bottone "Salva" -> POST /api/journeys/flow (persiste su Supabase;
+//           l'autorizzazione mapeditor/admin e' ricontrollata lato server).
+// I ruoli diversi da mapeditor/admin vedono il viewer in sola lettura.
 import { useEffect, useMemo, useState } from 'react';
 import FlowViewer, { type FlowEditCtx } from './FlowViewer';
 import { FLOW_EDITOR_CSS } from './flow-editor-styles';
@@ -208,21 +210,39 @@ export default function FlowEditor({ journeyId, flow, role, templates = [] }: Fl
         <button
           type="button"
           className="fe-btn fe-btn-danger"
-          disabled={!ed.dirty}
+          disabled={!ed.dirty || ed.saving}
           onClick={() => { if (window.confirm('Annullare tutte le modifiche non salvate?')) ed.reset(); }}
         >
           Annulla modifiche
         </button>
+        <button
+          type="button"
+          className="fe-btn fe-btn-primary"
+          disabled={!ed.dirty || ed.saving}
+          onClick={() => { void ed.save(); }}
+          title="Salva il flow su Supabase"
+        >
+          {ed.saving ? 'Salvataggio…' : 'Salva'}
+        </button>
         <span className="fe-toolbar-spacer" />
-        {ed.dirty
-          ? <span className="fe-dirty" role="status">Modifiche non salvate — solo in questa pagina, il salvataggio arriva con la Fase 3</span>
-          : <span className="fe-clean">Nessuna modifica</span>}
+        {ed.saving
+          ? <span className="fe-dirty" role="status">Salvataggio in corso…</span>
+          : ed.dirty
+            ? <span className="fe-dirty" role="status">Modifiche non salvate</span>
+            : <span className="fe-clean">Nessuna modifica</span>}
       </div>
 
       {ed.lastError && (
         <div className="fe-error" role="alert">
           <span>{ed.lastError.message}</span>
           <button type="button" aria-label="Chiudi" onClick={ed.clearError}>&times;</button>
+        </div>
+      )}
+
+      {ed.saveError && (
+        <div className="fe-error" role="alert">
+          <span>Salvataggio non riuscito: {ed.saveError}</span>
+          <button type="button" aria-label="Chiudi" onClick={ed.clearSaveError}>&times;</button>
         </div>
       )}
 
