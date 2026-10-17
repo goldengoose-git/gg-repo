@@ -1,10 +1,8 @@
 'use client';
 
-// Guscio client che commuta tra Dashboard e Templates e trasporta lo stato
-// (filtro KPI / journey selezionato) tra le due viste. Ex switchView() + i
-// vari goToJourneyFromHome/openTemplateListFromHome dell'originale.
 import { useState } from 'react';
 import type { TemplateVM, JourneyVM } from '@/lib/mappers';
+import type { AppRole } from '@/lib/types';
 import Dashboard, { type DashFilter } from './Dashboard';
 import TemplateList from './TemplateList';
 import MapView from './MapView';
@@ -12,8 +10,12 @@ import MapView from './MapView';
 type View = 'dashboard' | 'map' | 'templates';
 
 export default function RepositoryApp({
-  templates, journeys,
-}: { templates: TemplateVM[]; journeys: JourneyVM[] }) {
+  templates, journeys, role = null,
+}: {
+  templates: TemplateVM[];
+  journeys: JourneyVM[];
+  role?: AppRole | null;
+}) {
   const [view, setView] = useState<View>('dashboard');
   const [initialFilter, setInitialFilter] = useState<DashFilter>('all');
   const [journeyName, setJourneyName] = useState<string | null>(null);
@@ -58,6 +60,7 @@ export default function RepositoryApp({
           templates={templates}
           journeys={journeys}
           onOpenTemplates={openTemplatesByName}
+          role={role}
         />
       )}
       {view === 'templates' && (
