@@ -1,71 +1,86 @@
-// POST /api/journeys/flow
-// Salva il Flow (albero) e, opzionalmente, le note di un journey.
-// Equivalente dell'azione SSJS "saveJourneyFlow", ma:
-//   - l'autorizzazione (mapeditor/admin) e' verificata sul server e NON aggirabile;
-//   - la validazione e' la STESSA usata dalla UI (validateFlowState): nessuna divergenza;
-//   - la scrittura usa la service key, quindi e' esplicita e tracciabile.
+// POST /api/journeys
+// Crea un nuovo Journey (riga in public.journeys). Solo admin.
+// Stesso schema degli altri endpoint di scrittura: requireRole -> validazione -> service key.
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, AuthError } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { normalizeFlowState, validateFlowState } from '@/lib/flow-edit';
+
+/** slug stabile: minuscole, trattini, solo [a-z0-9-]. Come gli id esistenti ("welcome", "thankyou-reco"). */
+export function slugify(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
 
 export async function POST(req: NextRequest) {
   try {
-    // 1) Autorizzazione: mapeditor o admin (come da roadmap Fase 3).
-    await requireRole(['mapeditor', 'admin']);
+    await requireRole(['admin']);
 
-    // 2) Input
     const body = await req.json().catch(() => null);
     if (!body || typeof body !== 'object') {
       return NextResponse.json({ success: false, message: 'Body JSON mancante.' }, { status: 400 });
     }
-    const { journeyId, state, notes } = body as {
-      journeyId?: string;
-      state?: unknown;
-      notes?: unknown;
+    const b = body as Record<string, unknown>;
+
+    const name = typeof b.name === 'string' ? b.name.trim() : '';
+    if (!name) {
+      return NextResponse.json({ success: false, message: 'Il nome e\' obbligatorio.' }, { status: 400 });
+    }
+
+    // id: usa quello fornito (ripulito) oppure derivalo dal nome.
+    const rawId = typeof b.id === 'string' && b.id.trim() ? b.id : name;
+    const id = slugify(rawId);
+    if (!id) {
+      return NextResponse.json({ success: false, message: 'Slug (id) non valido.' }, { status: 400 });
+    }
+
+    const str = (v: unknown, def = '') => (typeof v === 'string' ? v : def);
+    const tags = Array.isArray(b.tags)
+      ? b.tags.map((t) => String(t).trim()).filter(Boolean)
+      : typeof b.tags === 'string'
+        ? b.tags.split(',').map((t) => t.trim()).filter(Boolean)
+        : [];
+
+    const miroLink = str(b.miroBoardLink);
+
+    // Solo le colonne che impostiamo: tutte le altre (flow, map_json, date) usano i default DB.
+    const row = {
+      id,
+      name,
+      description: str(b.description),
+      miro_board: miroLink,
+      miro_board_link: miroLink,
+      hero_img: str(b.heroImg),
+      tags,
+      flow_rules_text: str(b.flowRulesText),
+      notes: str(b.notes),
+      ppt_link: str(b.pptLink),
+      status: str(b.status, 'Active') || 'Active',
+      active: str(b.active, 'Yes') || 'Yes',
     };
-    if (!journeyId || typeof journeyId !== 'string') {
-      return NextResponse.json({ success: false, message: 'journeyId mancante.' }, { status: 400 });
-    }
-    if (notes != null && typeof notes !== 'string') {
-      return NextResponse.json({ success: false, message: 'notes deve essere una stringa.' }, { status: 400 });
-    }
 
-    // 3) Normalizzazione + validazione (stessa logica del client; mai fidarsi del body)
-    const flowState = normalizeFlowState(state);
-    const problems = validateFlowState(flowState);
-    if (problems.length) {
-      return NextResponse.json(
-        { success: false, message: 'Flow non valido.', errors: problems },
-        { status: 422 },
-      );
-    }
-
-    // 4) Scrittura (patch minima: flow sempre, notes solo se fornite)
     const supabase = createAdminClient();
-    const patch: Record<string, unknown> = { flow_view_json: flowState };
-    if (typeof notes === 'string') patch.notes = notes;
-
     const { data, error } = await supabase
       .from('journeys')
-      .update(patch)
-      .eq('id', journeyId)
+      .insert(row)
       .select('id')
       .single();
 
     if (error) {
+      // 23505 = unique_violation (slug/PK gia' esistente)
+      if ((error as { code?: string }).code === '23505') {
+        return NextResponse.json(
+          { success: false, message: `Esiste gia' un journey con id "${id}". Cambia nome o id.` },
+          { status: 409 },
+        );
+      }
       return NextResponse.json({ success: false, message: error.message }, { status: 500 });
     }
-    if (!data) {
-      return NextResponse.json({ success: false, message: 'Journey non trovato.' }, { status: 404 });
-    }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Flow salvato correttamente.',
-      id: data.id,
-      state: flowState,
-    });
+    return NextResponse.json({ success: true, message: 'Journey creato.', id: data.id });
   } catch (e) {
     if (e instanceof AuthError) {
       return NextResponse.json({ success: false, message: e.message }, { status: e.status });
