@@ -1,14 +1,17 @@
 'use client';
 /**
- * use-flow-editor.ts - collega flow-edit + flow-history a React (Fase 2: solo stato client).
+ * use-flow-editor.ts - collega flow-edit + flow-history a React.
+ *   Fase 2: stato client (add/remove, undo/redo, reset).
+ *   Fase 3: save() -> POST /api/journeys/flow (requireRole mapeditor/admin lato server).
  *
- * Uso in FlowViewer / contenitore:
+ * Uso nel contenitore (FlowEditor):
  *   const ed = useFlowEditor({ journeyId, initialState: hydrateFlowState(...), role });
  *   <FlowViewer nodes={ed.state.nodes} ... />
  *   ed.addNode({kind:'branch', id}, {type:'email', title:'...'});
- *   ed.removeItem(id); ed.removeBranch(branchId); ed.reset();
+ *   await ed.save();   // persiste su Supabase
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   addBranch as opAddBranch,
   addDivider as opAddDivider,
@@ -28,6 +31,7 @@ import {
   commit,
   createHistory,
   isDirty,
+  markSaved,
   redo as hRedo,
   reset as hReset,
   undo as hUndo,
@@ -48,10 +52,13 @@ export interface UseFlowEditorArgs {
 }
 
 export function useFlowEditor({ journeyId, initialState, role }: UseFlowEditorArgs) {
+  const router = useRouter();
   const canEdit = canEditFlow(role);
   const [history, setHistory] = useState<FlowHistory>(() => createHistory(normalizeFlowState(initialState)));
   const [forJourney, setForJourney] = useState(journeyId);
   const [lastError, setLastError] = useState<EditError | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Cambio journey: si riparte dall'originale del nuovo journey (le modifiche non salvate si perdono).
   if (forJourney !== journeyId) {
@@ -59,6 +66,7 @@ export function useFlowEditor({ journeyId, initialState, role }: UseFlowEditorAr
     setForJourney(journeyId);
     setHistory(fresh);
     setLastError(null);
+    setSaveError(null);
   }
 
   const ref = useRef(history);
@@ -99,6 +107,52 @@ export function useFlowEditor({ journeyId, initialState, role }: UseFlowEditorAr
     return () => window.removeEventListener('beforeunload', handler);
   }, [dirty]);
 
+  // FASE 3 — salvataggio su Supabase via API route (autorizzazione ricontrollata lato server).
+  const save = useCallback(
+    async (notesToSave?: string): Promise<boolean> => {
+      if (!canEdit) {
+        setSaveError('Il tuo ruolo non puo\' salvare il flow.');
+        return false;
+      }
+      setSaving(true);
+      setSaveError(null);
+      try {
+        const payload: Record<string, unknown> = { journeyId, state: ref.current.present };
+        if (typeof notesToSave === 'string') payload.notes = notesToSave;
+
+        const res = await fetch('/api/journeys/flow', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json().catch(() => null);
+
+        if (!res.ok || !json?.success) {
+          const base = json?.message ?? `Errore ${res.status}`;
+          const msg = Array.isArray(json?.errors) && json.errors.length
+            ? `${base} (${json.errors.join('; ')})`
+            : base;
+          setSaveError(msg);
+          return false;
+        }
+
+        // Successo: il present diventa il nuovo "originale" (dirty -> false)
+        const n = markSaved(ref.current);
+        ref.current = n;
+        setHistory(n);
+        // Riallinea i dati SSR (notes/flow della pagina) con quanto appena salvato.
+        router.refresh();
+        return true;
+      } catch (e) {
+        setSaveError(e instanceof Error ? e.message : 'Errore di rete durante il salvataggio.');
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [canEdit, journeyId, router],
+  );
+
   return {
     state: history.present,
     original: history.original,
@@ -108,6 +162,10 @@ export function useFlowEditor({ journeyId, initialState, role }: UseFlowEditorAr
     canRedo: canRedo(history),
     lastError,
     clearError: useCallback(() => setLastError(null), []),
+    saving,
+    saveError,
+    clearSaveError: useCallback(() => setSaveError(null), []),
+    save,
     addNode: useCallback((target: FlowTarget, spec: NewNodeSpec) => apply((s) => opAddNode(s, journeyId, target, spec)), [apply, journeyId]),
     addDivider: useCallback((name?: string) => apply((s) => opAddDivider(s, journeyId, name)), [apply, journeyId]),
     addBranch: useCallback((splitId: string, label?: string) => apply((s) => opAddBranch(s, journeyId, splitId, label)), [apply, journeyId]),
