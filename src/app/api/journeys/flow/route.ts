@@ -1,121 +1,76 @@
-// /api/journeys
-//   POST   -> crea un nuovo Journey (solo admin)
-//   DELETE -> elimina un Journey esistente per id (?id=slug) (solo admin)
-// Stesso schema degli altri endpoint: requireRole -> validazione -> service key.
+// POST /api/journeys/flow
+// Salva il Flow (albero) e/oppure le note di un journey.
+//   - requireRole(['mapeditor','admin']) verificato sul server, non aggirabile;
+//   - `state` e `notes` sono entrambi OPZIONALI: si scrive solo cio' che viene passato,
+//     cosi' un salvataggio di sole note non azzera il flow (e viceversa);
+//   - lo stato, se presente, viene ri-normalizzato e ri-validato (non ci si fida del body);
+//   - scrittura con service key.
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, AuthError } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
-
-/** slug stabile: minuscole, trattini, solo [a-z0-9-]. Come gli id esistenti ("welcome", "thankyou-reco"). */
-function slugify(raw: string): string {
-  return raw
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80);
-}
+import { normalizeFlowState, validateFlowState } from '@/lib/flow-edit';
 
 export async function POST(req: NextRequest) {
   try {
-    await requireRole(['admin']);
+    await requireRole(['mapeditor', 'admin']);
 
     const body = await req.json().catch(() => null);
     if (!body || typeof body !== 'object') {
       return NextResponse.json({ success: false, message: 'Body JSON mancante.' }, { status: 400 });
     }
-    const b = body as Record<string, unknown>;
-
-    const name = typeof b.name === 'string' ? b.name.trim() : '';
-    if (!name) {
-      return NextResponse.json({ success: false, message: 'Il nome e\' obbligatorio.' }, { status: 400 });
-    }
-
-    const rawId = typeof b.id === 'string' && b.id.trim() ? b.id : name;
-    const id = slugify(rawId);
-    if (!id) {
-      return NextResponse.json({ success: false, message: 'Slug (id) non valido.' }, { status: 400 });
-    }
-
-    const str = (v: unknown, def = '') => (typeof v === 'string' ? v : def);
-    const tags = Array.isArray(b.tags)
-      ? b.tags.map((t) => String(t).trim()).filter(Boolean)
-      : typeof b.tags === 'string'
-        ? b.tags.split(',').map((t) => t.trim()).filter(Boolean)
-        : [];
-
-    const miroLink = str(b.miroBoardLink);
-
-    const row = {
-      id,
-      name,
-      description: str(b.description),
-      miro_board: miroLink,
-      miro_board_link: miroLink,
-      hero_img: str(b.heroImg),
-      tags,
-      flow_rules_text: str(b.flowRulesText),
-      notes: str(b.notes),
-      ppt_link: str(b.pptLink),
-      status: str(b.status, 'Active') || 'Active',
-      active: str(b.active, 'Yes') || 'Yes',
+    const { journeyId, state, notes } = body as {
+      journeyId?: string;
+      state?: unknown;
+      notes?: unknown;
     };
+    if (!journeyId || typeof journeyId !== 'string') {
+      return NextResponse.json({ success: false, message: 'journeyId mancante.' }, { status: 400 });
+    }
+    if (notes != null && typeof notes !== 'string') {
+      return NextResponse.json({ success: false, message: 'notes deve essere una stringa.' }, { status: 400 });
+    }
 
-    const supabase = createAdminClient();
-    const { data, error } = await supabase
-      .from('journeys')
-      .insert(row)
-      .select('id')
-      .single();
+    const hasState = state !== undefined && state !== null;
+    const hasNotes = typeof notes === 'string';
+    if (!hasState && !hasNotes) {
+      return NextResponse.json({ success: false, message: 'Niente da salvare (nessuno stato o nota).' }, { status: 400 });
+    }
 
-    if (error) {
-      if ((error as { code?: string }).code === '23505') {
+    const patch: Record<string, unknown> = {};
+    if (hasState) {
+      const flowState = normalizeFlowState(state);
+      const problems = validateFlowState(flowState);
+      if (problems.length) {
         return NextResponse.json(
-          { success: false, message: `Esiste gia' un journey con id "${id}". Cambia nome o id.` },
-          { status: 409 },
+          { success: false, message: 'Flow non valido.', errors: problems },
+          { status: 422 },
         );
       }
-      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+      patch.flow_view_json = flowState;
     }
-
-    return NextResponse.json({ success: true, message: 'Journey creato.', id: data.id });
-  } catch (e) {
-    if (e instanceof AuthError) {
-      return NextResponse.json({ success: false, message: e.message }, { status: e.status });
-    }
-    return NextResponse.json(
-      { success: false, message: 'Unhandled error.', error: String(e) },
-      { status: 500 },
-    );
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  try {
-    await requireRole(['admin']);
-
-    const id = new URL(req.url).searchParams.get('id');
-    if (!id) {
-      return NextResponse.json({ success: false, message: 'Parametro id mancante.' }, { status: 400 });
-    }
+    if (hasNotes) patch.notes = notes;
 
     const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('journeys')
-      .delete()
-      .eq('id', id)
+      .update(patch)
+      .eq('id', journeyId)
       .select('id')
-      .maybeSingle();
+      .single();
 
     if (error) {
       return NextResponse.json({ success: false, message: error.message }, { status: 500 });
     }
     if (!data) {
-      return NextResponse.json({ success: false, message: `Journey "${id}" non trovato.` }, { status: 404 });
+      return NextResponse.json({ success: false, message: 'Journey non trovato.' }, { status: 404 });
     }
 
-    // Nota: i template con journey_name = <nome> NON vengono toccati (collegamento per nome, non FK).
-    return NextResponse.json({ success: true, message: 'Journey eliminato.', id: data.id });
+    return NextResponse.json({
+      success: true,
+      message: 'Salvataggio riuscito.',
+      id: data.id,
+      saved: { flow: hasState, notes: hasNotes },
+    });
   } catch (e) {
     if (e instanceof AuthError) {
       return NextResponse.json({ success: false, message: e.message }, { status: e.status });
