@@ -34,7 +34,7 @@ export default async function HomePage() {
       {error ? (
         <div className="container"><div className="empty">Errore nel caricamento: {error.message}</div></div>
       ) : (
-        <RepositoryApp templates={templates} journeys={journeys} />
+       <RepositoryApp role={user.role} templates={templates} journeys={journeys} />
       )}
     </>
   );
