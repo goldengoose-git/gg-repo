@@ -2,8 +2,8 @@
 
 // Form "Nuovo Template" (Admin). Crea una riga in public.templates via POST /api/templates.
 // Obbligatorio solo `name`. Chiave logica unica: (name, delivery_code) -> avviso live se collide.
-// assets_json e mms_sms_config_json NON sono qui: nascono vuoti e si gestiscono dopo
-// (asset editing + modale MMS/SMS). last_update si prefilla a oggi (MM/DD/YYYY), editabile.
+// Asset gallery: righe {name,url} a mano oppure "Incolla JSON" -> assets_json.
+// mms_sms_config_json NON e' qui (si gestisce dalla modale MMS/SMS).
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { JourneyVM, TemplateVM } from '@/lib/mappers';
@@ -18,6 +18,7 @@ const EMPTY = {
   mmsCopyEn: '', mmsCopyZh: '', mmsCopyKr: '', smsCopyEn: '', smsCopyZh: '', smsCopyKr: '',
 };
 type FormState = typeof EMPTY;
+type AssetRow = { name: string; url: string };
 
 function todayMMDDYYYY(): string {
   const d = new Date();
@@ -34,23 +35,55 @@ export default function NewTemplateForm({
 }) {
   const router = useRouter();
   const [f, setF] = useState<FormState>(EMPTY);
+  const [assets, setAssets] = useState<AssetRow[]>([]);
+  const [assetsJsonText, setAssetsJsonText] = useState('');
+  const [assetsJsonErr, setAssetsJsonErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
 
-  // last_update: default a oggi dopo il mount (evita mismatch di hydration SSR/client)
   useEffect(() => { setF((s) => (s.lastUpdate ? s : { ...s, lastUpdate: todayMMDDYYYY() })); }, []);
 
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setF((s) => ({ ...s, [k]: e.target.value }));
 
-  // Collisione (name, delivery_code) sui template gia' caricati
   const existingPairs = useMemo(
     () => new Set(templates.map((t) => `${t.name}|||${t.deliveryCode || ''}`)),
     [templates],
   );
   const pairClash = f.name.trim() !== '' && existingPairs.has(`${f.name.trim()}|||${f.deliveryCode.trim()}`);
-
   const journeyNames = useMemo(() => journeys.map((j) => j.name).sort((a, b) => a.localeCompare(b)), [journeys]);
+
+  // --- Asset helpers ---
+  const addAsset = () => setAssets((a) => [...a, { name: '', url: '' }]);
+  const removeAsset = (i: number) => setAssets((a) => a.filter((_, idx) => idx !== i));
+  const setAsset = (i: number, k: keyof AssetRow, v: string) =>
+    setAssets((a) => a.map((row, idx) => (idx === i ? { ...row, [k]: v } : row)));
+
+  function importAssetsJson() {
+    setAssetsJsonErr(null);
+    try {
+      const parsed = JSON.parse(assetsJsonText);
+      if (!Array.isArray(parsed)) throw new Error('Deve essere un array JSON.');
+      const clean: AssetRow[] = parsed
+        .map((x: unknown) => {
+          const o = (x ?? {}) as Record<string, unknown>;
+          return { name: typeof o.name === 'string' ? o.name : '', url: typeof o.url === 'string' ? o.url : '' };
+        })
+        .filter((a) => a.url.trim() !== '');
+      if (!clean.length) throw new Error('Nessun asset con url valido trovato.');
+      setAssets(clean);
+      setAssetsJsonText('');
+    } catch (e) {
+      setAssetsJsonErr(e instanceof Error ? e.message : 'JSON non valido.');
+    }
+  }
+
+  function reset() {
+    setF({ ...EMPTY, lastUpdate: todayMMDDYYYY() });
+    setAssets([]);
+    setAssetsJsonText('');
+    setAssetsJsonErr(null);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -63,15 +96,20 @@ export default function NewTemplateForm({
       const res = await fetch('/api/templates', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...f, name: f.name.trim(), deliveryCode: f.deliveryCode.trim() }),
+        body: JSON.stringify({
+          ...f,
+          name: f.name.trim(),
+          deliveryCode: f.deliveryCode.trim(),
+          assets: assets.filter((a) => a.url.trim() !== '').map((a) => ({ name: a.name.trim(), url: a.url.trim() })),
+        }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.success) {
         setMsg({ kind: 'err', text: json?.message ?? `Errore ${res.status}` });
         return;
       }
-      setMsg({ kind: 'ok', text: 'Template creato.' });
-      setF({ ...EMPTY, lastUpdate: todayMMDDYYYY() });
+      setMsg({ kind: 'ok', text: `Template creato${json.assets ? ` con ${json.assets} asset` : ''}.` });
+      reset();
       router.refresh();
     } catch (err) {
       setMsg({ kind: 'err', text: err instanceof Error ? err.message : 'Errore di rete.' });
@@ -93,9 +131,7 @@ export default function NewTemplateForm({
   return (
     <div className="adm-card">
       <h2>Nuovo Template</h2>
-      <p className="adm-sub">
-        Asset e config MMS/SMS si aggiungono dopo, dagli editor dedicati. Qui crei la scheda del template.
-      </p>
+      <p className="adm-sub">Config MMS/SMS si aggiunge dopo dalla modale dedicata. Qui crei la scheda, inclusi gli asset.</p>
 
       <form onSubmit={submit}>
         {/* Base */}
@@ -175,6 +211,53 @@ export default function NewTemplateForm({
           </div>
         </div>
 
+        {/* Asset gallery */}
+        <h3 style={{ margin: '24px 0 4px', fontSize: 15 }}>Asset (gallery)</h3>
+        <p className="adm-sub" style={{ margin: '0 0 10px' }}>
+          Immagini del template (name + url) → <code>assets_json</code>. Aggiungile a mano o incolla un array JSON.
+        </p>
+
+        <details style={{ marginBottom: 12 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#444' }}>Incolla JSON asset</summary>
+          <div className="adm-field" style={{ marginTop: 10 }}>
+            <textarea
+              value={assetsJsonText}
+              onChange={(e) => setAssetsJsonText(e.target.value)}
+              placeholder='[{"name":"Hero","url":"https://..."},{"name":"Image1","url":"https://..."}]'
+              style={{ minHeight: 90, fontFamily: 'monospace', fontSize: 12 }}
+            />
+          </div>
+          <div className="adm-actions" style={{ marginTop: 10 }}>
+            <button type="button" className="adm-btn" onClick={importAssetsJson} disabled={!assetsJsonText.trim()}>Importa JSON</button>
+            {assetsJsonErr && <span style={{ color: '#b0281a', fontSize: 12 }}>{assetsJsonErr}</span>}
+          </div>
+        </details>
+
+        <div className="adm-list">
+          {assets.length === 0 && <div className="adm-sub">Nessun asset. Aggiungine o incolla il JSON.</div>}
+          {assets.map((a, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0' }}>
+              <input
+                value={a.name}
+                onChange={(e) => setAsset(i, 'name', e.target.value)}
+                placeholder="name"
+                style={{ width: 150, border: '1px solid #d9d6cf', borderRadius: 8, padding: '8px 10px', fontSize: 13, background: '#fdfdfb' }}
+              />
+              <input
+                value={a.url}
+                onChange={(e) => setAsset(i, 'url', e.target.value)}
+                placeholder="https://..."
+                style={{ flex: 1, minWidth: 0, border: '1px solid #d9d6cf', borderRadius: 8, padding: '8px 10px', fontSize: 13, background: '#fdfdfb' }}
+              />
+              <button type="button" className="adm-btn adm-btn-danger" onClick={() => removeAsset(i)} style={{ padding: '7px 12px' }}>×</button>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <button type="button" className="adm-btn" onClick={addAsset}>+ Aggiungi asset</button>
+          {assets.length > 0 && <span className="adm-help" style={{ marginLeft: 10 }}>{assets.length} asset</span>}
+        </div>
+
         {/* Flag */}
         <h3 style={{ margin: '24px 0 4px', fontSize: 15 }}>Flag</h3>
         <div className="adm-grid">
@@ -185,20 +268,12 @@ export default function NewTemplateForm({
           <YesNo k="wallet" label="Wallet" />
         </div>
 
-        {/* Avanzato: MMS/SMS copy + chiavi DE */}
+        {/* Avanzato */}
         <details style={{ marginTop: 20 }}>
-          <summary style={{ cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#444' }}>
-            MMS / SMS e chiavi DE (avanzato)
-          </summary>
+          <summary style={{ cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#444' }}>MMS / SMS e chiavi DE (avanzato)</summary>
           <div className="adm-grid" style={{ marginTop: 14 }}>
-            <div className="adm-field">
-              <label htmlFor="t-mlink">MMS link</label>
-              <input id="t-mlink" value={f.mmsLink} onChange={set('mmsLink')} placeholder="https://..." />
-            </div>
-            <div className="adm-field">
-              <label htmlFor="t-slink">SMS link</label>
-              <input id="t-slink" value={f.smsLink} onChange={set('smsLink')} placeholder="https://..." />
-            </div>
+            <div className="adm-field"><label htmlFor="t-mlink">MMS link</label><input id="t-mlink" value={f.mmsLink} onChange={set('mmsLink')} placeholder="https://..." /></div>
+            <div className="adm-field"><label htmlFor="t-slink">SMS link</label><input id="t-slink" value={f.smsLink} onChange={set('smsLink')} placeholder="https://..." /></div>
             <div className="adm-field"><label htmlFor="t-mce">MMS copy EN</label><input id="t-mce" value={f.mmsCopyEn} onChange={set('mmsCopyEn')} /></div>
             <div className="adm-field"><label htmlFor="t-mcz">MMS copy ZH</label><input id="t-mcz" value={f.mmsCopyZh} onChange={set('mmsCopyZh')} /></div>
             <div className="adm-field"><label htmlFor="t-mck">MMS copy KR</label><input id="t-mck" value={f.mmsCopyKr} onChange={set('mmsCopyKr')} /></div>
@@ -214,12 +289,12 @@ export default function NewTemplateForm({
           <button type="submit" className="adm-btn adm-btn-primary" disabled={saving || !f.name.trim() || pairClash}>
             {saving ? 'Creazione…' : 'Crea Template'}
           </button>
-          <button type="button" className="adm-btn" onClick={() => setF({ ...EMPTY, lastUpdate: todayMMDDYYYY() })} disabled={saving}>Pulisci</button>
+          <button type="button" className="adm-btn" onClick={reset} disabled={saving}>Pulisci</button>
         </div>
 
         {msg && (
           <div className={`adm-msg ${msg.kind}`} role={msg.kind === 'err' ? 'alert' : 'status'}>
-            {msg.kind === 'ok' ? 'Template creato. Lo trovi in Templates e, se collegato, nel journey.' : msg.text}
+            {msg.kind === 'ok' ? msg.text + ' Lo trovi in Templates e, se collegato, nel journey.' : msg.text}
           </div>
         )}
       </form>
