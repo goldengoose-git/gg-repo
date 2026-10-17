@@ -1,7 +1,7 @@
 // POST /api/templates
 // Crea un nuovo Template (riga in public.templates). Solo admin.
-// assets_json e mms_sms_config_json restano ai default DB (si gestiscono con gli
-// editor dedicati: asset editing + modale MMS/SMS). Chiave logica unica: (name, delivery_code).
+// `assets` (array {name,url}) -> assets_json. mms_sms_config_json resta al default DB
+// (si gestisce dalla modale MMS/SMS). Chiave logica unica: (name, delivery_code).
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, AuthError } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -27,6 +27,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: 'Il nome e\' obbligatorio.' }, { status: 400 });
     }
 
+    // assets_json: array di {name,url}. Si scartano gli item senza url.
+    const assets = Array.isArray(b.assets)
+      ? (b.assets as unknown[])
+          .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+          .map((x) => ({ name: typeof x.name === 'string' ? x.name : '', url: typeof x.url === 'string' ? x.url : '' }))
+          .filter((a) => a.url.trim() !== '')
+      : [];
+
     const row = {
       name,
       delivery_code: str(b.deliveryCode).trim(),
@@ -49,6 +57,7 @@ export async function POST(req: NextRequest) {
       last_update: str(b.lastUpdate),
       copy_de_key: str(b.copyDeKey),
       assets_de_key: str(b.assetsDeKey),
+      assets_json: assets,
       mms_link: str(b.mmsLink),
       sms_link: str(b.smsLink),
       mms_copy_en: str(b.mmsCopyEn),
@@ -67,7 +76,6 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
-      // 23505 = unique_violation su (name, delivery_code)
       if ((error as { code?: string }).code === '23505') {
         return NextResponse.json(
           {
@@ -80,7 +88,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, message: 'Template creato.', id: data.id });
+    return NextResponse.json({ success: true, message: 'Template creato.', id: data.id, assets: assets.length });
   } catch (e) {
     if (e instanceof AuthError) {
       return NextResponse.json({ success: false, message: e.message }, { status: e.status });
