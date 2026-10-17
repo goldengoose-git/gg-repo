@@ -1,0 +1,111 @@
+/* Stili base — ho portato le variabili colore/brand dal vecchio
+   REPO_CSS_VARIABLES così lo slice ha già l'aspetto Golden Goose.
+   Il resto del CSS originale (layout, componenti, animazioni) si
+   reintroduce quando porteremo le altre viste. */
+:root {
+  --bg-site: #fdfdfc;
+  --text-main: #1a1a1a;
+  --text-sub: #66625e;
+  --accent: #c9a96e;
+  --accent-dark: #9a7a42;
+  --border: #e8e6e1;
+  --green: #2e7d32;
+  --red: #c62828;
+  --badge-expired-bg: #ffebee;
+  --badge-expired-text: #c62828;
+  --badge-expired-border: #ffcdd2;
+  --badge-updated-bg: #e7f7ee;
+  --badge-updated-text: #1f7a46;
+  --badge-updated-border: #bfe8cf;
+  --font-ui: 'Instrument Sans', system-ui, sans-serif;
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font-ui);
+  background: var(--bg-site);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+
+.container { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
+
+/* Header */
+.app-header {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 64px; padding: 0 24px;
+  background: rgba(255,255,255,.97); backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+}
+.app-header .brand { font-family: var(--font-display); font-size: 1.4rem; font-weight: 600; }
+.app-header .brand em { color: var(--accent); font-style: italic; }
+.user-badge { display: flex; align-items: center; gap: 10px; font-size: .8rem; }
+.role-pill {
+  padding: 3px 10px; border-radius: 999px; font-size: .62rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px; color: #fff;
+}
+.role-pill.admin { background: linear-gradient(135deg, #c9a96e, #a07840); }
+.role-pill.mapeditor { background: linear-gradient(135deg, #6e9ec9, #3a6a9e); }
+.role-pill.user { background: linear-gradient(135deg, #aaa, #777); }
+.logout-btn {
+  border: 1px solid var(--border); background: #fff; color: var(--text-main);
+  padding: 6px 12px; border-radius: 6px; font-size: .7rem; cursor: pointer;
+  text-transform: uppercase; letter-spacing: 1px; font-weight: 600;
+}
+.logout-btn:hover { background: #000; color: #fff; border-color: #000; }
+
+/* KPI bar */
+.kpi-bar { display: flex; flex-wrap: wrap; gap: 10px; padding: 20px 0; }
+.kpi {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; border: 1px solid var(--border); border-radius: 999px; background: #fff;
+}
+.kpi .num { font-size: 1.1rem; font-weight: 700; }
+.kpi .label { font-size: .62rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-sub); }
+
+/* Toolbar */
+.toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+.search-input {
+  flex: 1; min-width: 220px; height: 40px; padding: 0 14px;
+  border: 1px solid var(--border); border-radius: 8px; font-size: .9rem; outline: none;
+}
+.search-input:focus { border-color: var(--accent); }
+
+/* Template list */
+.templates { display: flex; flex-direction: column; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.tpl-row { background: #fff; padding: 20px 24px; cursor: pointer; transition: background .2s; }
+.tpl-row:hover { background: #fafaf8; }
+.tpl-row .pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.pill { padding: 3px 9px; font-size: .58rem; font-weight: 700; text-transform: uppercase; border-radius: 4px; border: 1px solid transparent; }
+.pill.black { background: #000; color: #fff; }
+.pill.stopped { background: var(--badge-expired-bg); color: var(--badge-expired-text); border-color: var(--badge-expired-border); }
+.pill.gold { background: linear-gradient(145deg, #FFF2AD, #D4AF37, #996515); color: #5C4033; }
+.pill.silver { background: linear-gradient(180deg, #fff, #B8B9BE, #57585B); color: #333; }
+.badge { padding: 3px 9px; font-size: .55rem; font-weight: 700; text-transform: uppercase; border-radius: 999px; border: 1px solid transparent; }
+.badge.expired { background: var(--badge-expired-bg); color: var(--badge-expired-text); border-color: var(--badge-expired-border); }
+.badge.updated { background: var(--badge-updated-bg); color: var(--badge-updated-text); border-color: var(--badge-updated-border); }
+.tpl-row h3 { font-family: var(--font-display); font-size: 1.8rem; font-weight: 600; line-height: 1.1; }
+.tpl-row code { color: var(--accent); font-size: .72rem; }
+.tpl-row .subject { display: block; margin-top: 6px; font-size: .82rem; color: var(--text-sub); font-style: italic; }
+.empty { padding: 48px; text-align: center; color: var(--text-sub); }
+
+/* Login */
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.login-card { width: 100%; max-width: 420px; border: 1px solid var(--border); border-radius: 12px; padding: 36px; background: #fff; }
+.login-card h1 { font-family: var(--font-display); font-size: 2rem; margin-bottom: 6px; }
+.login-card h1 em { color: var(--accent); font-style: italic; }
+.login-card p.sub { color: var(--text-sub); font-size: .86rem; margin-bottom: 24px; }
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: .64rem; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; color: #555; margin-bottom: 6px; }
+.field input { width: 100%; height: 46px; padding: 0 14px; border: 1px solid #cfcfca; border-radius: 6px; font-size: .9rem; outline: none; }
+.field input:focus { border-color: #111; }
+.btn-primary { width: 100%; height: 48px; background: #111; color: #fff; border: none; border-radius: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; font-size: .74rem; cursor: pointer; }
+.btn-primary:hover { background: #000; }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.msg { margin-top: 16px; padding: 12px 14px; border-radius: 6px; font-size: .84rem; }
+.msg.error { background: var(--badge-expired-bg); color: var(--badge-expired-text); border: 1px solid var(--badge-expired-border); }
