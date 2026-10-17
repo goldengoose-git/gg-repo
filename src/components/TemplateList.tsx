@@ -6,6 +6,7 @@
 import { useMemo, useState } from 'react';
 import type { TemplateVM } from '@/lib/mappers';
 import { isTemplateExpired, isTemplateRecentlyUpdated } from '@/lib/mms-config';
+import TemplateDetail from './TemplateDetail';
 
 type FilterKey = 'all' | 'active' | 'stopped' | 'expired' | 'cdp' | 'mms' | 'wallet';
 
@@ -95,24 +96,31 @@ export default function TemplateList({ templates }: { templates: TemplateVM[] })
 }
 
 function TemplateRow({ t }: { t: TemplateVM }) {
+  const [open, setOpen] = useState(false);
   const expired = isTemplateExpired(t.lastUpdate);
   const updated = isTemplateRecentlyUpdated(t.lastUpdate);
   return (
-    <div className="tpl-row">
-      <div className="pills">
-        <span className={`pill ${t.stopped === 'Yes' ? 'stopped' : 'black'}`}>{t.status}</span>
-        <span className={`pill ${t.cdp === 'Yes' ? 'gold' : 'silver'}`}>CDP: {t.cdp}</span>
-        <span className={`pill ${t.mms === 'Yes' ? 'gold' : 'silver'}`}>MMS: {t.mms}</span>
-        <span className={`pill ${t.wallet === 'Yes' ? 'gold' : 'silver'}`}>Wallet: {t.wallet}</span>
-        {expired && <span className="badge expired">EXPIRED</span>}
-        {updated && <span className="badge updated">UPDATED</span>}
-        {t.mmsSmsItemsCount > 0 && (
-          <span className="badge updated">MMS/SMS · {t.mmsSmsItemsCount}</span>
-        )}
+    <div className={`tpl-row${open ? ' open' : ''}`}>
+      <div className="tpl-row-head" onClick={() => setOpen((o) => !o)}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="pills">
+            <span className={`pill ${t.stopped === 'Yes' ? 'stopped' : 'black'}`}>{t.status}</span>
+            <span className={`pill ${t.cdp === 'Yes' ? 'gold' : 'silver'}`}>CDP: {t.cdp}</span>
+            <span className={`pill ${t.mms === 'Yes' ? 'gold' : 'silver'}`}>MMS: {t.mms}</span>
+            <span className={`pill ${t.wallet === 'Yes' ? 'gold' : 'silver'}`}>Wallet: {t.wallet}</span>
+            {expired && <span className="badge expired">EXPIRED</span>}
+            {updated && <span className="badge updated">UPDATED</span>}
+            {t.mmsSmsItemsCount > 0 && (
+              <span className="badge updated">MMS/SMS · {t.mmsSmsItemsCount}</span>
+            )}
+          </div>
+          <h3>{t.name}</h3>
+          <code>{t.deliveryCode || '-'}</code>
+          {t.subjectLine && <span className="subject"><strong>Subject:</strong> {t.subjectLine}</span>}
+        </div>
+        <div className="tpl-row-toggle">{open ? 'Chiudi −' : 'Dettagli +'}</div>
       </div>
-      <h3>{t.name}</h3>
-      <code>{t.deliveryCode || '-'}</code>
-      {t.subjectLine && <span className="subject"><strong>Subject:</strong> {t.subjectLine}</span>}
+      {open && <TemplateDetail t={t} />}
     </div>
   );
 }
