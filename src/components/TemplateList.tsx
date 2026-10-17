@@ -10,9 +10,19 @@ import TemplateDetail from './TemplateDetail';
 
 type FilterKey = 'all' | 'active' | 'stopped' | 'expired' | 'cdp' | 'mms' | 'wallet';
 
-export default function TemplateList({ templates }: { templates: TemplateVM[] }) {
+export default function TemplateList({
+  templates,
+  initialFilter = 'all',
+  journeyName = null,
+}: {
+  templates: TemplateVM[];
+  initialFilter?: FilterKey;
+  journeyName?: string | null;
+}) {
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<FilterKey>('all');
+  const [filter, setFilter] = useState<FilterKey>(initialFilter);
+  // filtro per journey arrivato dalla dashboard (clearabile dall'utente)
+  const [cjFilter, setCjFilter] = useState<string | null>(journeyName);
 
   const stats = useMemo(() => {
     const total = templates.length;
@@ -31,6 +41,8 @@ export default function TemplateList({ templates }: { templates: TemplateVM[] })
   const visible = useMemo(() => {
     const q = query.toLowerCase().trim();
     return templates.filter((t) => {
+      // filtro per journey (dalla dashboard)
+      if (cjFilter && t.journeyName !== cjFilter) return false;
       // filtro
       let pass = true;
       if (filter === 'active') pass = t.stopped !== 'Yes';
@@ -45,7 +57,7 @@ export default function TemplateList({ templates }: { templates: TemplateVM[] })
       return [t.name, t.deliveryCode, t.journeyName, t.subjectLine]
         .join(' ').toLowerCase().includes(q);
     });
-  }, [templates, query, filter]);
+  }, [templates, query, filter, cjFilter]);
 
   const Kpi = ({ k, label, value }: { k: FilterKey; label: string; value: number }) => (
     <button
@@ -69,6 +81,13 @@ export default function TemplateList({ templates }: { templates: TemplateVM[] })
         <Kpi k="mms" label="MMS" value={stats.mms} />
         <Kpi k="wallet" label="Wallet" value={stats.wallet} />
       </div>
+
+      {cjFilter && (
+        <div className="cj-filter-banner">
+          <span>Filtrato per journey: <strong>{cjFilter}</strong></span>
+          <button onClick={() => setCjFilter(null)}>× Rimuovi filtro</button>
+        </div>
+      )}
 
       <div className="toolbar">
         <input
