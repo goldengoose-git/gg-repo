@@ -59,13 +59,7 @@ src/
    - `supabase/migrations/0002_rls.sql`
 3. Settings → API: copia `Project URL`, `anon public key`, `service_role key`.
 
-Project URL
 
-anon public
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnbnp5bXVhenV3bmRjbWJma2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIyMjAwMDYsImV4cCI6MjEwNzc5NjAwNn0.cVd6SHWcDvsXnuCEeDx3Ek_G-S0_loip0kcZIqa6nCs
-
-service_role
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnbnp5bXVhenV3bmRjbWJma2Z4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjIyMDAwNiwiZXhwIjoyMTA3Nzk2MDA2fQ.3GNRYzCiWwaK1KTMOnzG8n2nZnuL4soWK_o19tXwnFY
 
 
 ### 2. Variabili d'ambiente
