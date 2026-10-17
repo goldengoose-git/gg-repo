@@ -40,12 +40,26 @@ export const ADMIN_CSS = `
 .adm-btn:hover { background: #f6f4ef; }
 .adm-btn-primary { background: #111; color: #fff; border-color: #111; }
 .adm-btn-primary:hover { background: #333; }
+.adm-btn-danger { background: #fff; color: #b0281a; border-color: #f0c4bd; }
+.adm-btn-danger:hover { background: #fdecea; }
 .adm-btn:disabled { opacity: .5; cursor: not-allowed; }
 
 .adm-msg { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-top: 16px; }
 .adm-msg.ok { background: #eaf7ee; color: #1e7a3a; border: 1px solid #b7e2c4; }
 .adm-msg.err { background: #fdecea; color: #b0281a; border: 1px solid #f5c3bd; }
 .adm-msg a { color: inherit; font-weight: 600; text-decoration: underline; }
+
+/* Lista journey esistenti (delete) */
+.adm-list { display: flex; flex-direction: column; }
+.adm-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 2px; border-bottom: 1px solid #eee7dd;
+}
+.adm-row:last-child { border-bottom: none; }
+.adm-row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.adm-row-name { font-weight: 600; font-size: 14px; color: #222; }
+.adm-row-id { font-size: 12px; color: #999; }
+.adm-row .adm-btn { padding: 7px 14px; font-size: 13px; }
 
 @media (max-width: 640px) { .adm-grid { grid-template-columns: 1fr; } }
 `;
