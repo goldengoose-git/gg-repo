@@ -7,8 +7,9 @@ import { useState } from 'react';
 import type { TemplateVM, JourneyVM } from '@/lib/mappers';
 import Dashboard, { type DashFilter } from './Dashboard';
 import TemplateList from './TemplateList';
+import MapView from './MapView';
 
-type View = 'dashboard' | 'templates';
+type View = 'dashboard' | 'map' | 'templates';
 
 export default function RepositoryApp({
   templates, journeys,
@@ -30,21 +31,36 @@ export default function RepositoryApp({
     setView('templates');
   }
 
+  function openTemplatesByName(name: string) {
+    setJourneyName(name);
+    setInitialFilter('all');
+    setView('templates');
+  }
+
   return (
     <>
       <div className="view-tabs container">
         <button className={view === 'dashboard' ? 'active' : ''} onClick={() => setView('dashboard')}>Dashboard</button>
+        <button className={view === 'map' ? 'active' : ''} onClick={() => setView('map')}>Map</button>
         <button className={view === 'templates' ? 'active' : ''} onClick={() => { setJourneyName(null); setInitialFilter('all'); setView('templates'); }}>Templates</button>
       </div>
 
-      {view === 'dashboard' ? (
+      {view === 'dashboard' && (
         <Dashboard
           templates={templates}
           journeys={journeys}
           onKpi={goToTemplatesWithFilter}
           onOpenJourney={openJourney}
         />
-      ) : (
+      )}
+      {view === 'map' && (
+        <MapView
+          templates={templates}
+          journeys={journeys}
+          onOpenTemplates={openTemplatesByName}
+        />
+      )}
+      {view === 'templates' && (
         <TemplateList
           templates={templates}
           initialFilter={initialFilter}
