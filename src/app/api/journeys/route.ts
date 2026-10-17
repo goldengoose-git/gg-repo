@@ -1,6 +1,7 @@
-// POST /api/journeys
-// Crea un nuovo Journey (riga in public.journeys). Solo admin.
-// Stesso schema degli altri endpoint di scrittura: requireRole -> validazione -> service key.
+// /api/journeys
+//   POST   -> crea un nuovo Journey (solo admin)
+//   DELETE -> elimina un Journey esistente per id (?id=slug) (solo admin)
+// Stesso schema degli altri endpoint: requireRole -> validazione -> service key.
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole, AuthError } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -30,7 +31,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: 'Il nome e\' obbligatorio.' }, { status: 400 });
     }
 
-    // id: usa quello fornito (ripulito) oppure derivalo dal nome.
     const rawId = typeof b.id === 'string' && b.id.trim() ? b.id : name;
     const id = slugify(rawId);
     if (!id) {
@@ -46,7 +46,6 @@ export async function POST(req: NextRequest) {
 
     const miroLink = str(b.miroBoardLink);
 
-    // Solo le colonne che impostiamo: tutte le altre (flow, map_json, date) usano i default DB.
     const row = {
       id,
       name,
@@ -70,7 +69,6 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
-      // 23505 = unique_violation (slug/PK gia' esistente)
       if ((error as { code?: string }).code === '23505') {
         return NextResponse.json(
           { success: false, message: `Esiste gia' un journey con id "${id}". Cambia nome o id.` },
@@ -81,6 +79,43 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, message: 'Journey creato.', id: data.id });
+  } catch (e) {
+    if (e instanceof AuthError) {
+      return NextResponse.json({ success: false, message: e.message }, { status: e.status });
+    }
+    return NextResponse.json(
+      { success: false, message: 'Unhandled error.', error: String(e) },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    await requireRole(['admin']);
+
+    const id = new URL(req.url).searchParams.get('id');
+    if (!id) {
+      return NextResponse.json({ success: false, message: 'Parametro id mancante.' }, { status: 400 });
+    }
+
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from('journeys')
+      .delete()
+      .eq('id', id)
+      .select('id')
+      .maybeSingle();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+    if (!data) {
+      return NextResponse.json({ success: false, message: `Journey "${id}" non trovato.` }, { status: 404 });
+    }
+
+    // Nota: i template con journey_name = <nome> NON vengono toccati (collegamento per nome, non FK).
+    return NextResponse.json({ success: true, message: 'Journey eliminato.', id: data.id });
   } catch (e) {
     if (e instanceof AuthError) {
       return NextResponse.json({ success: false, message: e.message }, { status: e.status });
