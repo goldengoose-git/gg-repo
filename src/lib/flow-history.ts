@@ -1,15 +1,17 @@
 /**
- * flow-history.ts - storico undo/redo + "stato originale" per la Fase 2.
+ * flow-history.ts - storico undo/redo + "stato originale" per la Fase 2/3.
  *
- * Tutto in memoria: nessun localStorage, nessuna scrittura su DB. Un ricaricamento della
- * pagina ricrea la history dallo stato letto da Supabase, quindi riporta sempre all'originale.
+ * Tutto in memoria: nessun localStorage. Un ricaricamento della pagina ricrea la
+ * history dallo stato letto da Supabase. In Fase 3, dopo un salvataggio riuscito,
+ * lo stato corrente diventa il nuovo "originale" (markSaved), cosi' `isDirty`
+ * torna a false senza perdere lo storico di undo/redo.
  */
 import type { FlowState } from './flow-edit';
 
 export const HISTORY_LIMIT = 100;
 
 export interface FlowHistory {
-  /** fotografia dello stato al caricamento (mai modificata) */
+  /** fotografia dello stato "salvato" (al caricamento, o dopo markSaved) */
   readonly original: FlowState;
   readonly past: readonly FlowState[];
   readonly present: FlowState;
@@ -44,6 +46,16 @@ export function redo(h: FlowHistory): FlowHistory {
 /** "Annulla modifiche": torna allo stato originale e svuota lo storico. */
 export function reset(h: FlowHistory): FlowHistory {
   return createHistory(h.original);
+}
+
+/**
+ * Dopo un salvataggio riuscito: lo stato corrente diventa il nuovo "originale".
+ * Lo storico undo/redo resta intatto (si puo' ancora annullare dopo il salvataggio),
+ * ma `isDirty` ricomincia a confrontare da questo nuovo baseline.
+ */
+export function markSaved(h: FlowHistory): FlowHistory {
+  if (h.present === h.original) return h;
+  return { ...h, original: h.present };
 }
 
 /**
