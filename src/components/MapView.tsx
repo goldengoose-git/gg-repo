@@ -4,10 +4,13 @@
 // aprendone uno si vede il Flow + note + template collegati (L2).
 // FASE 2 del Flow: gli utenti mapeditor/admin possono aggiungere/rimuovere step
 // (solo stato client, nessun salvataggio). Per il ruolo 'user' resta sola lettura.
+// Note del journey: editabili per mapeditor/admin (JourneyNotesEditor).
 import { useMemo, useState } from 'react';
 import type { TemplateVM, JourneyVM } from '@/lib/mappers';
 import type { AppRole } from '@/lib/types';
 import FlowEditor, { type FlowTemplateOption } from './FlowEditor';
+import JourneyNotesEditor from './JourneyNotesEditor';
+import { canEditFlow } from '@/hooks/use-flow-editor';
 
 export default function MapView({
   templates, journeys, onOpenTemplates, role = null,
@@ -69,12 +72,12 @@ export default function MapView({
             templates={templateOptions}
           />
 
-          {journey.notes && (
-            <div className="flow-notes-block">
-              <div className="flow-panel-title small">Journey <em>Notes</em></div>
-              <div className="flow-notes">{journey.notes}</div>
-            </div>
-          )}
+          <JourneyNotesEditor
+            key={`notes-${journey.id}`}
+            journeyId={journey.id}
+            initialNotes={journey.notes}
+            canEdit={canEditFlow(role)}
+          />
 
           <div className="flow-linked">
             <div className="flow-panel-title small">Journey <em>Templates</em></div>
