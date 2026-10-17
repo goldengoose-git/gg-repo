@@ -81,3 +81,37 @@ export interface JourneyRow {
 // Costanti di validazione (identiche al vecchio 01-jsconfig.js)
 export const MMS_SMS_ALLOWED_MARKETS = ['KR', 'CN', 'TW', 'MO', 'HK', 'FR', 'AE', 'ES', 'IT'];
 export const MMS_SMS_ALLOWED_CHANNELS = ['MMS', 'SMS'];
+
+// --- Flow (albero del journey, ex 04-jsflow.js) ---
+export type FlowNodeType = 'entry' | 'email' | 'delay' | 'split' | 'exit';
+
+export interface FlowBranch {
+  id: string;
+  label: string;
+  nodes: FlowNode[];
+}
+
+export interface FlowNode {
+  id: string;
+  type: FlowNodeType;
+  title: string;
+  meta: string;
+  isDivider?: boolean;
+  name?: string;               // per i divider (nome fase)
+  // email
+  templateIndex?: number | null;
+  templateCode?: string;
+  templateName?: string;
+  hasMmsSmsConfig?: boolean;
+  mmsSmsDeliveryCodes?: string[];
+  // split
+  branchCount?: number;
+  branches?: FlowBranch[];
+}
+
+export interface FlowState {
+  version: number;
+  nodeSeq: number;
+  branchSeq: number;
+  nodes: FlowNode[];
+}

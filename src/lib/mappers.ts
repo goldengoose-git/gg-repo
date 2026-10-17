@@ -2,7 +2,8 @@
 // (item.Name, item.deliveryCode, item.MMS_SMS_CONFIG_JSON...). Qui traduciamo
 // una volta al confine, così i componenti restano leggibili e vicini
 // all'originale, e il DB resta in snake_case idiomatico.
-import type { TemplateRow, JourneyRow, Asset, MmsSmsItem } from './types';
+import type { TemplateRow, JourneyRow, Asset, MmsSmsItem, FlowState, FlowNode } from './types';
+import { hydrateFlowState } from './flow';
 
 // --- Journey view-model ---
 export interface JourneyVM {
@@ -16,9 +17,18 @@ export interface JourneyVM {
   status: string;
   active: string;
   flowRulesText: string;
+  notes: string;
+  flow: FlowState;   // albero del flusso, idratato (lettura)
 }
 
 export function toJourneyVM(r: JourneyRow): JourneyVM {
+  // Usa flow_view_json se contiene nodi, altrimenti default_flow_json (come l'originale)
+  const fv = r.flow_view_json as any;
+  const hasFlowView =
+    (Array.isArray(fv) && fv.length) ||
+    (fv && typeof fv === 'object' && Array.isArray(fv.nodes) && fv.nodes.length);
+  const source = hasFlowView ? fv : (r.default_flow_json ?? []);
+
   return {
     id: r.id,
     name: r.name,
@@ -30,6 +40,8 @@ export function toJourneyVM(r: JourneyRow): JourneyVM {
     status: r.status,
     active: r.active,
     flowRulesText: r.flow_rules_text,
+    notes: r.notes,
+    flow: hydrateFlowState(source, r.id),
   };
 }
 
