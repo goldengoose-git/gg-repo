@@ -1,25 +1,25 @@
 'use client';
 
-// Guscio client che commuta tra Dashboard, Map, Templates e (solo admin) Admin,
-// e trasporta lo stato (filtro KPI / journey selezionato) tra le viste.
+// Guscio client: header (con le toggle di vista) + Dashboard / Map / Templates / Admin.
+// Trasporta lo stato (filtro KPI / journey selezionato) tra le viste.
 import { useState } from 'react';
 import type { TemplateVM, JourneyVM } from '@/lib/mappers';
 import type { AppRole } from '@/lib/types';
+import Header, { type HeaderView } from './Header';
 import Dashboard, { type DashFilter } from './Dashboard';
 import TemplateList from './TemplateList';
 import MapView from './MapView';
 import AdminApp from './admin/AdminApp';
 
-type View = 'dashboard' | 'map' | 'templates' | 'admin';
-
 export default function RepositoryApp({
-  templates, journeys, role = null,
+  templates, journeys, role = null, username = 'User',
 }: {
   templates: TemplateVM[];
   journeys: JourneyVM[];
   role?: AppRole | null;
+  username?: string;
 }) {
-  const [view, setView] = useState<View>('dashboard');
+  const [view, setView] = useState<HeaderView>('dashboard');
   const [initialFilter, setInitialFilter] = useState<DashFilter>('all');
   const [journeyName, setJourneyName] = useState<string | null>(null);
 
@@ -44,16 +44,21 @@ export default function RepositoryApp({
     setView('templates');
   }
 
+  // Le toggle dell'header: cambiano vista azzerando i filtri contestuali.
+  function switchView(v: HeaderView) {
+    if (v === 'templates') { setJourneyName(null); setInitialFilter('all'); }
+    setView(v);
+  }
+
   return (
     <>
-      <div className="view-tabs container">
-        <button className={view === 'dashboard' ? 'active' : ''} onClick={() => setView('dashboard')}>Dashboard</button>
-        <button className={view === 'map' ? 'active' : ''} onClick={() => setView('map')}>Map</button>
-        <button className={view === 'templates' ? 'active' : ''} onClick={() => { setJourneyName(null); setInitialFilter('all'); setView('templates'); }}>Templates</button>
-        {isAdmin && (
-          <button className={view === 'admin' ? 'active' : ''} onClick={() => setView('admin')}>Admin</button>
-        )}
-      </div>
+      <Header
+        username={username}
+        role={(role ?? 'user') as AppRole}
+        view={view}
+        onSwitch={switchView}
+        isAdmin={isAdmin}
+      />
 
       {view === 'dashboard' && (
         <Dashboard
