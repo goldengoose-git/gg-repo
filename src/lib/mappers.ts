@@ -2,7 +2,36 @@
 // (item.Name, item.deliveryCode, item.MMS_SMS_CONFIG_JSON...). Qui traduciamo
 // una volta al confine, così i componenti restano leggibili e vicini
 // all'originale, e il DB resta in snake_case idiomatico.
-import type { TemplateRow, Asset, MmsSmsItem } from './types';
+import type { TemplateRow, JourneyRow, Asset, MmsSmsItem } from './types';
+
+// --- Journey view-model ---
+export interface JourneyVM {
+  id: string;
+  name: string;
+  description: string;
+  img: string;
+  tags: string[];
+  miroBoardLink: string;
+  pptLink: string;
+  status: string;
+  active: string;
+  flowRulesText: string;
+}
+
+export function toJourneyVM(r: JourneyRow): JourneyVM {
+  return {
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    img: r.hero_img,
+    tags: Array.isArray(r.tags) ? r.tags : [],
+    miroBoardLink: r.miro_board_link,
+    pptLink: r.ppt_link,
+    status: r.status,
+    active: r.active,
+    flowRulesText: r.flow_rules_text,
+  };
+}
 
 export interface TemplateVM {
   id: string;
