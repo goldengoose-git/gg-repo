@@ -59,6 +59,12 @@ export interface TemplateVM {
   assetsDeKey: string;
   assets: Asset[];          // escluse mms/sms (come renderAssetGallery)
   mmsSmsItems: MmsSmsItem[]; // solo market attivi, come renderMmsSmsConfigSection
+  // --- dati completi per il modale MMS/SMS ---
+  mmsSmsAll: MmsSmsItem[];  // tutti gli item (ogni canale/mercato), per il modale
+  mmsLink: string;
+  smsLink: string;
+  mmsCopy: { en: string; zh: string; kr: string };
+  smsCopy: { en: string; zh: string; kr: string };
 }
 
 // Mercati mostrati nel blocco config, nell'ordine originale (03-jsviews.js)
@@ -107,5 +113,10 @@ export function toTemplateVM(r: TemplateRow): TemplateVM {
     assetsDeKey: r.assets_de_key,
     assets,
     mmsSmsItems,
+    mmsSmsAll: allItems,
+    mmsLink: r.mms_link,
+    smsLink: r.sms_link,
+    mmsCopy: { en: r.mms_copy_en, zh: r.mms_copy_zh, kr: r.mms_copy_kr },
+    smsCopy: { en: r.sms_copy_en, zh: r.sms_copy_zh, kr: r.sms_copy_kr },
   };
 }
