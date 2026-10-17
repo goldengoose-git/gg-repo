@@ -6,6 +6,8 @@
 import { useMemo } from 'react';
 import type { TemplateVM, JourneyVM } from '@/lib/mappers';
 import { isTemplateExpired } from '@/lib/mms-config';
+import CjTimeline from './CjTimeline';
+import CjSidebar from './CjSidebar';
 
 export type DashFilter =
   | 'all' | 'active' | 'stopped' | 'expired' | 'cdp' | 'mms' | 'wallet';
@@ -129,6 +131,15 @@ export default function Dashboard({ templates, journeys, onKpi, onOpenJourney }:
           })}
         </div>
       )}
+
+      {/* Timeline + sidebar journey (ex home-main-split dell'originale) */}
+      <div className="dash-split">
+        <div className="dash-split-main">
+          <div className="dash-section-head"><h2>Journey <em>Timeline</em></h2></div>
+          <CjTimeline />
+        </div>
+        <CjSidebar templates={templates} journeys={journeys} onOpenJourney={onOpenJourney} />
+      </div>
     </div>
   );
 }

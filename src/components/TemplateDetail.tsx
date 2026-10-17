@@ -4,7 +4,9 @@
 // Mostra: asset gallery, config MMS/SMS, template details, copy IT/EN, DE keys.
 // È puramente di lettura; le azioni di edit (asset / MMS config) arrivano nei
 // giri successivi e sono riservate all'admin.
+import { useState } from 'react';
 import type { TemplateVM } from '@/lib/mappers';
+import MmsModal from './MmsModal';
 
 function pills(raw: string): string[] {
   return String(raw || '')
@@ -14,6 +16,8 @@ function pills(raw: string): string[] {
 }
 
 export default function TemplateDetail({ t }: { t: TemplateVM }) {
+  const [mmsOpen, setMmsOpen] = useState(false);
+  const hasMmsSms = t.mmsSmsAll.length > 0;
   return (
     <div className="tpl-detail">
       {/* ---- colonna sinistra: asset + config + meta ---- */}
@@ -81,7 +85,14 @@ export default function TemplateDetail({ t }: { t: TemplateVM }) {
             View Full Template
           </a>
         )}
+        {hasMmsSms && (
+          <button className="btn-view secondary" onClick={() => setMmsOpen(true)}>
+            MMS / SMS Details
+          </button>
+        )}
       </div>
+
+      {mmsOpen && <MmsModal t={t} onClose={() => setMmsOpen(false)} />}
     </div>
   );
 }
