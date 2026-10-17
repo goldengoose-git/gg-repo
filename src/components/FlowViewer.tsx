@@ -1,9 +1,19 @@
 'use client';
 
-// Flow Viewer (sola lettura) — porting di renderFlow / renderFlowSequence /
-// renderNodeCard / renderSplitBranches di 04-jsflow.js, in React ricorsivo.
-// FASE 1: solo visualizzazione. L'editing arriva nelle fasi successive.
+// Flow Viewer — porting di renderFlow / renderFlowSequence / renderNodeCard / renderSplitBranches
+// di 04-jsflow.js, in React ricorsivo.
+// FASE 1: visualizzazione (invariata). FASE 2: se si passa `edit` compaiono i controlli
+// (+ Step, x su nodi/divider, x sul branch, + Branch). Senza `edit` il rendering e' quello di prima.
 import type { FlowNode, FlowBranch } from '@/lib/types';
+import { MAX_BRANCHES, MIN_BRANCHES, type FlowTarget } from '@/lib/flow-edit';
+
+/** Azioni di editing: le fornisce <FlowEditor>. Il viewer resta puramente presentazionale. */
+export interface FlowEditCtx {
+  addStep(target: FlowTarget): void;
+  removeItem(node: FlowNode): void;
+  removeBranch(split: FlowNode, branch: FlowBranch): void;
+  addBranch(split: FlowNode): void;
+}
 
 const icons: Record<string, React.ReactNode> = {
   entry: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="8" /><polyline points="12 8 16 12 12 16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>,
@@ -19,10 +29,25 @@ const Connector = () => (
   </div>
 );
 
-function NodeCard({ node }: { node: FlowNode }) {
+function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className="fe-remove"
+      aria-label={label}
+      title={label}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+    >
+      &times;
+    </button>
+  );
+}
+
+function NodeCard({ node, edit }: { node: FlowNode; edit?: FlowEditCtx }) {
   if (node.isDivider) {
     return (
-      <div className="flow-divider">
+      <div className={`flow-divider${edit ? ' fe-editable' : ''}`} data-divider-id={node.id}>
+        {edit && <RemoveButton label={`Rimuovi fase ${node.name ?? ''}`.trim()} onClick={() => edit.removeItem(node)} />}
         <div className="flow-divider-label">Phase</div>
         <div className="flow-divider-name">{node.name}</div>
       </div>
@@ -35,7 +60,8 @@ function NodeCard({ node }: { node: FlowNode }) {
   return (
     <div className="flow-node-block">
       <div className="flow-node-wrap">
-        <div className={`flow-node is-${node.type}`}>
+        <div className={`flow-node is-${node.type}${edit ? ' fe-editable' : ''}`} data-node-id={node.id}>
+          {edit && <RemoveButton label={`Rimuovi step ${node.title}`} onClick={() => edit.removeItem(node)} />}
           <div className={`flow-node-icon ${node.type}`}>{icons[node.type] || icons.exit}</div>
           <div className="flow-node-title">{node.title}</div>
         </div>
@@ -43,50 +69,92 @@ function NodeCard({ node }: { node: FlowNode }) {
         {hasMms && <div className="flow-node-hint">MMS/SMS: {node.mmsSmsDeliveryCodes!.join(', ')}</div>}
       </div>
 
-      {node.type === 'split' && node.branches && <SplitBranches branches={node.branches} count={node.branchCount || 2} />}
+      {node.type === 'split' && node.branches && <SplitBranches split={node} edit={edit} />}
     </div>
   );
 }
 
-function SplitBranches({ branches, count }: { branches: FlowBranch[]; count: number }) {
+function SplitBranches({ split, edit }: { split: FlowNode; edit?: FlowEditCtx }) {
+  const branches = split.branches ?? [];
+  const count = branches.length || split.branchCount || 2;
+  const canRemoveBranch = branches.length > MIN_BRANCHES;
   return (
     <div className="flow-split">
       <div className={`flow-branch-grid cols-${Math.min(count, 5)}`}>
         {branches.map((b) => (
-          <div className="flow-branch" key={b.id}>
-            <div className="flow-branch-label">{b.label || 'Branch'}</div>
+          <div className="flow-branch" key={b.id} data-branch-id={b.id}>
+            <div className="flow-branch-label">
+              {b.label || 'Branch'}
+              {edit && (
+                <button
+                  type="button"
+                  className="fe-branch-remove"
+                  disabled={!canRemoveBranch}
+                  aria-label={`Rimuovi branch ${b.label}`}
+                  title={canRemoveBranch ? `Rimuovi branch ${b.label}` : `Uno split richiede almeno ${MIN_BRANCHES} branch: rimuovi l'intero step split`}
+                  onClick={() => edit.removeBranch(split, b)}
+                >
+                  &times;
+                </button>
+              )}
+            </div>
             {b.nodes.length ? (
-              <Sequence nodes={b.nodes} />
+              <Sequence nodes={b.nodes} target={edit ? { kind: 'branch', id: b.id } : undefined} edit={edit} />
             ) : (
-              <div className="flow-empty-branch">No steps</div>
+              <>
+                <div className="flow-empty-branch">No steps</div>
+                {edit && <Sequence nodes={[]} target={{ kind: 'branch', id: b.id }} edit={edit} />}
+              </>
             )}
           </div>
         ))}
       </div>
+      {edit && (
+        <div className="fe-branch-tools">
+          <button
+            type="button"
+            className="fe-btn fe-btn-sm"
+            disabled={branches.length >= MAX_BRANCHES}
+            title={branches.length >= MAX_BRANCHES ? `Massimo ${MAX_BRANCHES} branch` : 'Aggiungi un branch'}
+            onClick={() => edit.addBranch(split)}
+          >
+            + Branch
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function Sequence({ nodes }: { nodes: FlowNode[] }) {
+function Sequence({ nodes, target, edit }: { nodes: FlowNode[]; target?: FlowTarget; edit?: FlowEditCtx }) {
   return (
     <div className="flow-seq">
       {nodes.map((n, i) => (
         <div key={n.id} style={{ display: 'contents' }}>
           {i > 0 && <Connector />}
-          <NodeCard node={n} />
+          <NodeCard node={n} edit={edit} />
         </div>
       ))}
+      {edit && target && (
+        <>
+          {nodes.length > 0 && <Connector />}
+          <div className="fe-add-row">
+            <button type="button" className="fe-btn fe-btn-sm" onClick={() => edit.addStep(target)}>+ Step</button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-export default function FlowViewer({ nodes }: { nodes: FlowNode[] }) {
-  if (!nodes.length) {
+export default function FlowViewer({ nodes, edit }: { nodes: FlowNode[]; edit?: FlowEditCtx }) {
+  if (!nodes.length && !edit) {
     return <div className="flow-empty">Nessuno step nel flusso di questo journey.</div>;
   }
   return (
     <div className="flow-canvas">
-      <Sequence nodes={nodes} />
+      {!nodes.length && <div className="flow-empty">Nessuno step nel flusso di questo journey.</div>}
+      <Sequence nodes={nodes} target={edit ? { kind: 'root' } : undefined} edit={edit} />
     </div>
   );
 }
