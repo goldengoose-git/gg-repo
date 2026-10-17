@@ -8,6 +8,7 @@ import type { TemplateVM, JourneyVM } from '@/lib/mappers';
 import { isTemplateExpired } from '@/lib/mms-config';
 import CjTimeline from './CjTimeline';
 import CjSidebar from './CjSidebar';
+import MmsSection from './MmsSection';
 
 export type DashFilter =
   | 'all' | 'active' | 'stopped' | 'expired' | 'cdp' | 'mms' | 'wallet';
@@ -131,6 +132,9 @@ export default function Dashboard({ templates, journeys, onKpi, onOpenJourney }:
           })}
         </div>
       )}
+
+      {/* MMS / SMS Assets */}
+      <MmsSection templates={templates} />
 
       {/* Timeline + sidebar journey (ex home-main-split dell'originale) */}
       <div className="dash-split">

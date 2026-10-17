@@ -25,7 +25,10 @@ export default function Loader() {
   return (
     <div className={`gg-loader${pct >= 100 ? ' fade' : ''}`}>
       <div className="gg-loader-ring" />
+      <div className="gg-loader-brand">GOLDEN GOOSE</div>
       <div className="gg-loader-title">Customer Journey <em>Library</em></div>
+      <div className="gg-loader-sub">Marketing Cloud · CJ Repository</div>
+      <div className="gg-loader-bar"><div className="gg-loader-bar-fill" style={{ width: `${pct}%` }} /></div>
       <div className="gg-loader-pct">{pct}%</div>
     </div>
   );
