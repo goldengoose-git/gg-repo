@@ -8,6 +8,7 @@ import { toTemplateVM, toJourneyVM } from '@/lib/mappers';
 import type { TemplateRow, JourneyRow } from '@/lib/types';
 import Header from '@/components/Header';
 import RepositoryApp from '@/components/RepositoryApp';
+import Loader from '@/components/Loader';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,7 @@ export default async function HomePage() {
 
   return (
     <>
+      <Loader />
       <Header username={user.username} role={user.role} />
       {error ? (
         <div className="container"><div className="empty">Errore nel caricamento: {error.message}</div></div>
