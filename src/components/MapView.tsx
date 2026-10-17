@@ -1,18 +1,22 @@
 'use client';
 
 // Map view (ex buildL1 / openL2 di 03-jsviews.js). Griglia journey (L1);
-// aprendone uno si vede il Flow Viewer + note + template collegati (L2).
-// FASE 1 del Flow: sola lettura.
+// aprendone uno si vede il Flow + note + template collegati (L2).
+// FASE 2 del Flow: gli utenti mapeditor/admin possono aggiungere/rimuovere step
+// (solo stato client, nessun salvataggio). Per il ruolo 'user' resta sola lettura.
 import { useMemo, useState } from 'react';
 import type { TemplateVM, JourneyVM } from '@/lib/mappers';
-import FlowViewer from './FlowViewer';
+import type { AppRole } from '@/lib/types';
+import FlowEditor, { type FlowTemplateOption } from './FlowEditor';
 
 export default function MapView({
-  templates, journeys, onOpenTemplates,
+  templates, journeys, onOpenTemplates, role = null,
 }: {
   templates: TemplateVM[];
   journeys: JourneyVM[];
   onOpenTemplates: (journeyName: string) => void;
+  /** ruolo dell'utente; se assente/null il flow resta in sola lettura */
+  role?: AppRole | null;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const journey = openId ? journeys.find((j) => j.id === openId) : null;
@@ -21,6 +25,17 @@ export default function MapView({
     if (!journey) return [];
     return templates.filter((t) => t.journeyName === journey.name);
   }, [journey, templates]);
+
+  // Opzioni per lo step Email. `index` = posizione nell'array `templates`
+  // (come DATA.indexOf nell'originale SFMC).
+  const templateOptions = useMemo<FlowTemplateOption[]>(
+    () => linkedTemplates.map((t) => ({
+      index: templates.indexOf(t),
+      name: t.name,
+      deliveryCode: t.deliveryCode || '',
+    })),
+    [linkedTemplates, templates],
+  );
 
   const counts = useMemo(() => {
     const map: Record<string, number> = {};
@@ -45,7 +60,14 @@ export default function MapView({
 
         <div className="flow-panel">
           <div className="flow-panel-title">Journey <em>Flow View</em></div>
-          <FlowViewer nodes={journey.flow.nodes} />
+          {/* key: cambiando journey l'editor riparte dallo stato originale */}
+          <FlowEditor
+            key={journey.id}
+            journeyId={journey.id}
+            flow={journey.flow}
+            role={role}
+            templates={templateOptions}
+          />
 
           {journey.notes && (
             <div className="flow-notes-block">
