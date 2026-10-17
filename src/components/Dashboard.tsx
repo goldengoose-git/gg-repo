@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { TemplateVM, JourneyVM } from '@/lib/mappers';
 import { isTemplateExpired } from '@/lib/mms-config';
 import CjTimeline from './CjTimeline';
+import MmsSection from './MmsSection';
 
 export type DashFilter =
   | 'all' | 'active' | 'stopped' | 'expired' | 'cdp' | 'mms' | 'wallet';
@@ -202,6 +203,11 @@ export default function Dashboard({ templates, journeys, onKpi, onOpenJourney }:
           })}
           {visibleJourneys.length === 0 && <div className="home-hub-empty">Nessun journey.</div>}
         </div>
+      </div>
+
+      {/* MMS / SMS ASSETS */}
+      <div style={{ padding: '0 24px' }}>
+        <MmsSection templates={templates} />
       </div>
 
       {/* MAIN SPLIT: presentazione + sidebar CJ */}
